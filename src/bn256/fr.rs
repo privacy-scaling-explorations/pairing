@@ -667,6 +667,7 @@ impl FieldExt for Fr {
 
 #[cfg(test)]
 use ff::{Field, PrimeField};
+use std::ops::{AddAssign, MulAssign, SubAssign};
 
 #[test]
 fn test_zeta() {
@@ -737,4 +738,198 @@ fn test_from_u512() {
 #[test]
 fn test_field() {
     crate::tests::field::random_field_tests::<Fr>();
+}
+
+#[test]
+fn test_add() {
+    // Add zero equal itself
+    let mut a = Fr::from_raw([
+        0x7e7140b5196b9e6f,
+        0x9abac9e4157b6172,
+        0xf04bc41062fd7322,
+        0x1185fa9c9fef6326,
+    ]);
+    a.add_assign(Fr::zero());
+    assert_eq!(
+        a,
+        Fr::from_raw([
+            0x7e7140b5196b9e6f,
+            0x9abac9e4157b6172,
+            0xf04bc41062fd7322,
+            0x1185fa9c9fef6326,
+        ])
+    );
+
+    // Add mod equal itself
+    let b = Fr::from_raw([
+        0x43e1f593f0000001,
+        0x2833e84879b97091,
+        0xb85045b68181585d,
+        0x30644e72e131a029,
+    ]);
+    a.add_assign(b);
+    assert_eq!(
+        a,
+        Fr::from_raw([
+            0x7e7140b5196b9e6f,
+            0x9abac9e4157b6172,
+            0xf04bc41062fd7322,
+            0x1185fa9c9fef6326,
+        ])
+    );
+
+    // Add one equal incremented itself
+    a.add_assign(Fr::one());
+    assert_eq!(
+        a,
+        Fr::from_raw([
+            0x7e7140b5196b9e70,
+            0x9abac9e4157b6172,
+            0xf04bc41062fd7322,
+            0x1185fa9c9fef6326,
+        ])
+    );
+}
+
+#[test]
+fn test_sub() {
+    // Sub zero equal itself
+    let mut a = Fr::from_raw([
+        0x7e7140b5196b9e6f,
+        0x9abac9e4157b6172,
+        0xf04bc41062fd7322,
+        0x1185fa9c9fef6326,
+    ]);
+    a.sub_assign(Fr::zero());
+    assert_eq!(
+        a,
+        Fr::from_raw([
+            0x7e7140b5196b9e6f,
+            0x9abac9e4157b6172,
+            0xf04bc41062fd7322,
+            0x1185fa9c9fef6326,
+        ])
+    );
+
+    // Sub mod equal itself
+    let b = Fr::from_raw([
+        0x43e1f593f0000001,
+        0x2833e84879b97091,
+        0xb85045b68181585d,
+        0x30644e72e131a029,
+    ]);
+    a.sub_assign(b);
+    assert_eq!(
+        a,
+        Fr::from_raw([
+            0x7e7140b5196b9e6f,
+            0x9abac9e4157b6172,
+            0xf04bc41062fd7322,
+            0x1185fa9c9fef6326,
+        ])
+    );
+
+    // Sub one equal decremented itself
+    a.sub_assign(Fr::one());
+    assert_eq!(
+        a,
+        Fr::from_raw([
+            0x7e7140b5196b9e6e,
+            0x9abac9e4157b6172,
+            0xf04bc41062fd7322,
+            0x1185fa9c9fef6326,
+        ])
+    );
+}
+
+#[test]
+fn test_mul() {
+    // Mul random field
+    let mut a = Fr::from_raw([
+        0x6b7e9b8faeefc81a,
+        0xe30a8463f348ba42,
+        0xeff3cb67a8279c9c,
+        0x3d303651bd7c774d,
+    ]);
+    a.mul_assign(Fr::from_raw([
+        0x13ae28e3bc35ebeb,
+        0xa10f4488075cae2c,
+        0x8160e95a853c3b5d,
+        0x5ae3f03b561a841d,
+    ]));
+    assert_eq!(
+        a,
+        Fr::from_raw([
+            0x0417f80df17a3ebc,
+            0xf7e6edaf7e953f87,
+            0xe06b196270fbf5d4,
+            0x119aceb10b6b0d46
+        ])
+    );
+
+    // Mul a * b + a * c = a ( b + c )
+    let mut b = Fr::from_raw([
+        0x13ae28e3bc35ebeb,
+        0xa10f4488075cae2c,
+        0x8160e95a853c3b5d,
+        0x5ae3f03b561a841d,
+    ]);
+    let mut c = Fr::from_raw([
+        0xd0970e5ed6f72cb5,
+        0xa6682093ccc81082,
+        0x06673b0101343b00,
+        0x0e7db4ea6533afa9,
+    ]);
+    let copy_a = a;
+    let mut copy_b = b;
+    let copy_c = c;
+    b.mul_assign(a);
+    c.mul_assign(a);
+    copy_b.add_assign(copy_c);
+    assert_eq!(b.add_assign(c), copy_b.mul_assign(copy_a));
+}
+
+#[test]
+fn test_double() {
+    // Double random equal to adding itself
+    let a = Fr::from_raw([
+        0x6b7e9b8faeefc81a,
+        0xe30a8463f348ba42,
+        0xeff3cb67a8279c9c,
+        0x3d303651bd7c774d,
+    ]);
+    let mut b = Fr::from_raw([
+        0x6b7e9b8faeefc81a,
+        0xe30a8463f348ba42,
+        0xeff3cb67a8279c9c,
+        0x3d303651bd7c774d,
+    ]);
+    b.add_assign(Fr::from_raw([
+        0x6b7e9b8faeefc81a,
+        0xe30a8463f348ba42,
+        0xeff3cb67a8279c9c,
+        0x3d303651bd7c774d,
+    ]));
+    assert_eq!(a.double(), b);
+}
+
+#[test]
+fn test_square() {
+    // Square random
+    let a = Fr::from_raw([
+        0x6b7e9b8faeefc81a,
+        0xe30a8463f348ba42,
+        0xeff3cb67a8279c9c,
+        0x3d303651bd7c774d,
+    ]);
+    let sq = a.square();
+    assert_eq!(
+        sq,
+        Fr::from_raw([
+            0xb3656703c1e79650,
+            0xa293ae9f7da14011,
+            0x569272907963b1f5,
+            0x29e8fcd5ca4e3afe
+        ])
+    );
 }
