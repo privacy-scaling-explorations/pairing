@@ -156,7 +156,7 @@ pub fn double(a: &[u64; 4]) -> [u64; 4] {
     [r0, r1, r2, r3]
 }
 
-pub fn mul(a: &[u64; 4], b: &[u64; 4]) -> [u64; 4] {
+pub fn mul(a: &[u64; 4], b: &[u64; 4]) -> [u64; 8] {
     let mut r0: u64;
     let mut r1: u64;
     let mut r2: u64;
@@ -164,6 +164,7 @@ pub fn mul(a: &[u64; 4], b: &[u64; 4]) -> [u64; 4] {
     let mut r4: u64;
     let mut r5: u64;
     let mut r6: u64;
+    let mut r7: u64;
     unsafe {
         asm!(
             // load all array to register
@@ -293,6 +294,7 @@ pub fn mul(a: &[u64; 4], b: &[u64; 4]) -> [u64; 4] {
             out("r15") r7,
         )
     }
+    [r0, r1, r2, r3, r4, r5, r6, r7]
 }
 
 #[cfg(test)]
@@ -414,5 +416,12 @@ mod asembly_tests {
             0x1185fa9c9fef6326,
         ];
         assert_eq!(add(&a, &b), double(&a));
+    }
+
+    #[test]
+    fn test_schoolbook() {
+        let a: [u64; 4] = [1, 1, 1, 1];
+        let b: [u64; 4] = [1, 1, 1, 1];
+        assert_eq!(mul(&a, &b), [1,2,3,4,3,2,1,0]);
     }
 }
