@@ -156,6 +156,145 @@ pub fn double(a: &[u64; 4]) -> [u64; 4] {
     [r0, r1, r2, r3]
 }
 
+pub fn mul(a: &[u64; 4], b: &[u64; 4]) -> [u64; 4] {
+    let mut r0: u64;
+    let mut r1: u64;
+    let mut r2: u64;
+    let mut r3: u64;
+    let mut r4: u64;
+    let mut r5: u64;
+    let mut r6: u64;
+    unsafe {
+        asm!(
+            // load all array to register
+            // "mov r12, qword ptr [{a_ptr} + 0]",
+            // "mov r13, qword ptr [{a_ptr} + 8]",
+            // "mov r14, qword ptr [{a_ptr} + 16]",
+            // "mov r15, qword ptr [{a_ptr} + 24]",
+
+            // schoolbook multiplication
+            //    *    |   a0    |   a1    |   a2    |   a3
+            //    b0   | b0 * a0 | b0 * a1 | b0 * a2 | b0 * a3
+            //    b1   | b1 * a0 | b1 * a1 | b1 * a2 | b1 * a3
+            //    b2   | b2 * a0 | b2 * a1 | b2 * a2 | b2 * a3
+            //    b3   | b3 * a0 | b3 * a1 | b3 * a2 | b3 * a3
+
+            //    r8   | a0 * b0 |         |         |
+            //    r9   | a0 * b1 | a1 * b0 |         |
+            //    r10  | a0 * b2 | a1 * b1 | a2 * b0 |
+            //    r11  | a0 * b3 | a1 * b2 | a2 * b1 | a3 * b0 |
+            //    r12  | a1 * b3 | a2 * b2 | a3 * b1 |
+            //    r13  | a2 * b3 | a3 * b2 |         |
+            //    r14  | a3 * b3 |         |         |
+
+            //    r9   | 00  |     |     |
+            //    r10  | 01  | 10  |     |
+            //    r11  | 02  | 11  | 20  |
+            //    r12  | 03  | 12  | 21  | 30
+            //    r13  | 13  | 22  | 31  |
+            //    r14  | 23  | 32  |     |
+            //    r15  | 33  |     |     |
+
+            // `a0`
+            "mov rdx, qword ptr [{a_ptr} + 0]",
+
+            // a0 * b0
+            "mulx r9, r8, qword ptr [{b_ptr} + 0]",
+
+            // a0 * b1
+            "mulx r10, rbx, qword ptr [{b_ptr} + 8]",
+            "add r9, rbx",
+
+            // a0 * b2
+            "mulx r11, rbx, qword ptr [{b_ptr} + 16]",
+            "adcx r10, rbx",
+
+            // a0 * b3
+            "mulx r12, rbx, qword ptr [{b_ptr} + 24]",
+            "adcx r11, rbx",
+            "adc r12, 0",
+
+            // `a1`
+            "mov rdx, [{a_ptr} + 8]",
+
+            // a1 * b0
+            "mulx r15, rbx, qword ptr [{b_ptr} + 0]",
+            "add r9, rbx",
+            "adcx r10, r15",
+
+            // a1 * b1
+            "mulx r15, rbx, qword ptr [{b_ptr} + 8]",
+            "adcx r10, rbx",
+            "adcx r11, r15",
+
+            // a1 * b2
+            "mulx r15, rbx, qword ptr [{b_ptr} + 16]",
+            "adcx r11, rbx",
+            "adcx r12, r15",
+
+            // a1 * b3
+            "mulx r13, rbx, qword ptr [{b_ptr} + 24]",
+            "adcx r12, rbx",
+
+            // `a2`
+            "mov rdx, [{a_ptr} + 16]",
+
+            // a2 * b0
+            "mulx r15, rbx, qword ptr [{b_ptr} + 0]",
+            "add r10, rbx",
+            "adcx r11, r15",
+
+            // a2 * b1
+            "mulx r15, rbx, qword ptr [{b_ptr} + 8]",
+            "adcx r11, rbx",
+            "adcx r12, r15",
+
+            // a2 * b2
+            "mulx r15, rbx, qword ptr [{b_ptr} + 16]",
+            "adcx r12, rbx",
+            "adcx r13, r15",
+
+            // a2 * b3
+            "mulx r14, rbx, qword ptr [{b_ptr} + 24]",
+            "adcx r13, rbx",
+
+            // `a3`
+            "mov rdx, [{a_ptr} + 24]",
+
+            // a3 * b0
+            "mulx r15, rbx, qword ptr [{b_ptr} + 0]",
+            "add r11, rbx",
+            "adcx r12, r15",
+
+            // a3 * b1
+            "mulx r15, rbx, qword ptr [{b_ptr} + 8]",
+            "adcx r12, rbx",
+            "adcx r13, r15",
+
+            // a3 * b2
+            "mulx r15, rbx, qword ptr [{b_ptr} + 16]",
+            "adcx r13, rbx",
+            "adcx r14, r15",
+
+            // a3 * b3
+            "mulx r15, rbx, qword ptr [{b_ptr} + 24]",
+            "adcx r14, rbx",
+            "adc r15, 0",
+
+            a_ptr = in(reg) a.as_ptr(),
+            b_ptr = in(reg) b.as_ptr(),
+            out("r8") r0,
+            out("r9") r1,
+            out("r10") r2,
+            out("r11") r3,
+            out("r12") r4,
+            out("r13") r5,
+            out("r14") r6,
+            out("r15") r7,
+        )
+    }
+}
+
 #[cfg(test)]
 mod asembly_tests {
     use super::*;
