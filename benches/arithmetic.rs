@@ -7,31 +7,41 @@ use rand_xorshift::XorShiftRng;
 use std::ops::{AddAssign, MulAssign, SubAssign};
 
 fn add_benchmark(mut rng: impl RngCore) {
-    let mut a = Fr::random(&mut rng);
-    let b = a;
-    a.add_assign(&b);
+    for _ in 0..10000 {
+        let mut a = Fr::random(&mut rng);
+        let b = a;
+        a.add_assign(&b);
+    }
 }
 
 fn sub_benchmark(mut rng: impl RngCore) {
-    let mut a = Fr::random(&mut rng);
-    let b = a;
-    a.sub_assign(&b);
+    for _ in 0..10000 {
+        let mut a = Fr::random(&mut rng);
+        let b = a;
+        a.sub_assign(&b);
+    }
 }
 
 fn double_benchmark(mut rng: impl RngCore) {
-    let a = Fr::random(&mut rng);
-    a.double();
+    for _ in 0..10000 {
+        let a = Fr::random(&mut rng);
+        a.double();
+    }
 }
 
 fn mul_benchmark(mut rng: impl RngCore) {
-    let mut a = Fr::random(&mut rng);
-    let b = a;
-    a.mul_assign(&b);
+    for _ in 0..10000 {
+        let mut a = Fr::random(&mut rng);
+        let b = a;
+        a.mul_assign(&b);
+    }
 }
 
 fn square_benchmark(mut rng: impl RngCore) {
-    let a = Fr::random(&mut rng);
-    a.square();
+    for _ in 0..10000 {
+        let a = Fr::random(&mut rng);
+        a.square();
+    }
 }
 
 fn field_arithmetic_benchmark(c: &mut Criterion) {
