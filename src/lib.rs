@@ -1,3 +1,5 @@
+#![feature(asm)]
+
 #[macro_use]
 mod ec;
 #[macro_use]
