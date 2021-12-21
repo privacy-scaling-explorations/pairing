@@ -1,11 +1,11 @@
-use pairing_bn256::bn256::Fr;
-
 const MODULUS: &[u64; 4] = &[
     0x43e1f593f0000001,
     0x2833e84879b97091,
     0xb85045b68181585d,
     0x30644e72e131a029,
 ];
+
+const INV: u64 = 0xc2e1f593efffffff;
 
 pub fn add(a: &[u64; 4], b: &[u64; 4]) -> [u64; 4] {
     let mut r0: u64;
@@ -156,7 +156,7 @@ pub fn double(a: &[u64; 4]) -> [u64; 4] {
     [r0, r1, r2, r3]
 }
 
-pub fn mul(a: &[u64; 4], b: &[u64; 4]) -> [u64; 8] {
+pub fn schoolbook(a: &[u64; 4], b: &[u64; 4]) -> [u64; 8] {
     let mut r0: u64;
     let mut r1: u64;
     let mut r2: u64;
@@ -292,9 +292,162 @@ pub fn mul(a: &[u64; 4], b: &[u64; 4]) -> [u64; 8] {
             out("r13") r5,
             out("r14") r6,
             out("r15") r7,
+            options(pure, readonly, nostack)
         )
     }
     [r0, r1, r2, r3, r4, r5, r6, r7]
+}
+
+pub fn montgomery(a: &[u64; 8]) -> [u64; 4] {
+    let mut r0: u64;
+    let mut r1: u64;
+    let mut r2: u64;
+    let mut r3: u64;
+
+    unsafe {
+        asm!(
+            // montgomery reduction
+            "xor r13, r13",
+            "xor r14, r14",
+            "xor r15, r15",
+
+            // `r8` -> 0
+            "mov rdx, qword ptr [{i_ptr}]",
+            "mulx rax, rdx, qword ptr [{a_ptr} + 0]",
+
+            // r8' * m0
+            "mulx r9, r8, qword ptr [{m_ptr} + 0]",
+            "add r8, qword ptr [{a_ptr} + 0]",
+            "adcx r9, qword ptr [{a_ptr} + 8]",
+
+            // r8' * m1
+            "mulx r10, rax, qword ptr [{m_ptr} + 8]",
+            "adcx r9, rax",
+            "adcx r10, qword ptr [{a_ptr} + 16]",
+
+            // r8' * m2
+            "mulx r11, rax, qword ptr [{m_ptr} + 16]",
+            "adcx r10, rax",
+            "adcx r11, qword ptr [{a_ptr} + 24]",
+
+            // r8' * m3
+            "mulx r12, rax, qword ptr [{m_ptr} + 24]",
+            "adcx r11, rax",
+            "adcx r12, [{a_ptr} + 32]",
+            "adc r13, 0",
+
+            // `r9` -> 0
+            "mov rdx, qword ptr [{i_ptr}]",
+            "mulx rax, rdx, r9",
+
+            // r9' * m0
+            "mulx rax, rcx, qword ptr [{m_ptr} + 0]",
+            "add r9, rcx",
+            "adcx r10, rax",
+
+            // r9' * m1
+            "mulx rax, rcx, qword ptr [{m_ptr} + 8]",
+            "adcx r10, rcx",
+            "adcx r11, rax",
+
+            // r9' * m2
+            "mulx rax, rcx, qword ptr [{m_ptr} + 16]",
+            "adcx r11, rcx",
+            "adcx r12, rax",
+
+            // r9' * m3
+            "mulx rax, rcx, qword ptr [{m_ptr} + 24]",
+            "adcx r12, rcx",
+            "adcx r13, rax",
+            "adcx r13, [{a_ptr} + 40]",
+            "adc r14, 0",
+
+            // `r10` -> 0
+            "mov rdx, qword ptr [{i_ptr}]",
+            "mulx rax, rdx, r10",
+
+            // r10' * m0
+            "mulx rax, rcx, qword ptr [{m_ptr} + 0]",
+            "add r10, rcx",
+            "adcx r11, rax",
+
+            // r10' * m1
+            "mulx rax, rcx, qword ptr [{m_ptr} + 8]",
+            "adcx r11, rcx",
+            "adcx r12, rax",
+
+            // r10' * m2
+            "mulx rax, rcx, qword ptr [{m_ptr} + 16]",
+            "adcx r12, rcx",
+            "adcx r13, rax",
+
+            // r10' * m3
+            "mulx rax, rcx, qword ptr [{m_ptr} + 24]",
+            "adcx r13, rcx",
+            "adcx r14, rax",
+            "adcx r14, [{a_ptr} + 48]",
+            "adc r15, 0",
+
+            // `r11` -> 0
+            "mov rdx, qword ptr [{i_ptr}]",
+            "mulx rax, rdx, r11",
+
+            // r11' * m0
+            "mulx rax, rcx, qword ptr [{m_ptr} + 0]",
+            "add r11, rcx",
+            "adcx r12, rax",
+
+            // r11' * m1
+            "mulx rax, rcx, qword ptr [{m_ptr} + 8]",
+            "adcx r12, rcx",
+            "adcx r13, rax",
+
+            // r11' * m2
+            "mulx rax, rcx, qword ptr [{m_ptr} + 16]",
+            "adcx r13, rcx",
+            "adcx r14, rax",
+
+            // r11' * m3
+            "mulx rax, rcx, qword ptr [{m_ptr} + 24]",
+            "adcx r14, rcx",
+            "adcx r15, rax",
+            "adcx r15, [{a_ptr} + 56]",
+
+            "mov r8, r12",
+            "mov r9, r13",
+            "mov r10, r14",
+            "mov r11, r15",
+
+            // mod reduction
+            "sub r8, qword ptr [{m_ptr} + 0]",
+            "sbb r9, qword ptr [{m_ptr} + 8]",
+            "sbb r10, qword ptr [{m_ptr} + 16]",
+            "sbb r11, qword ptr [{m_ptr} + 24]",
+
+            // if carry copy former registers to out areas
+            "cmovc r8, r12",
+            "cmovc r9, r13",
+            "cmovc r10, r14",
+            "cmovc r11, r15",
+
+            i_ptr = in(reg) &INV,
+            a_ptr = in(reg) a.as_ptr(),
+            m_ptr = in(reg) MODULUS.as_ptr(),
+            out("rax") _,
+            out("rcx") _,
+            out("rdx") _,
+            out("r8") _,
+            out("r9") _,
+            out("r10") _,
+            out("r11") _,
+            out("r12") r0,
+            out("r13") r1,
+            out("r14") r2,
+            out("r15") r3,
+            options(pure, readonly, nostack)
+        )
+    }
+    [r0, r1, r2, r3]
 }
 
 #[cfg(test)]
@@ -422,6 +575,19 @@ mod asembly_tests {
     fn test_schoolbook() {
         let a: [u64; 4] = [1, 1, 1, 1];
         let b: [u64; 4] = [1, 1, 1, 1];
-        assert_eq!(mul(&a, &b), [1,2,3,4,3,2,1,0]);
+        assert_eq!(schoolbook(&a, &b), [1, 2, 3, 4, 3, 2, 1, 0]);
+    }
+
+    #[test]
+    fn test_mont() {
+        assert_eq!(
+            montgomery(&[1, 2, 3, 4, 3, 2, 1, 0]),
+            [
+                7484583077752525450,
+                16115226892331589647,
+                11237030766184328511,
+                353155890138329104
+            ]
+        );
     }
 }
