@@ -406,83 +406,322 @@ impl Fr {
         let (r6, carry) = mac(r6, self.0[3], self.0[3], carry);
         let (r7, _) = adc(0, r7, carry);
 
-        Fr::montgomery_reduce(r0, r1, r2, r3, r4, r5, r6, r7)
+        Fr::montgomery_reduce(&[r0, r1, r2, r3, r4, r5, r6, r7])
     }
 
     #[allow(clippy::too_many_arguments)]
     #[inline(always)]
-    fn montgomery_reduce(
-        r0: u64,
-        r1: u64,
-        r2: u64,
-        r3: u64,
-        r4: u64,
-        r5: u64,
-        r6: u64,
-        r7: u64,
-    ) -> Self {
-        // The Montgomery reduction here is based on Algorithm 14.32 in
-        // Handbook of Applied Cryptography
-        // <http://cacr.uwaterloo.ca/hac/about/chap14.pdf>.
+    fn montgomery_reduce(a: &[u64; 8]) -> Self {
+        let mut r0: u64;
+        let mut r1: u64;
+        let mut r2: u64;
+        let mut r3: u64;
 
-        let k = r0.wrapping_mul(INV);
-        let (_, carry) = mac(r0, k, MODULUS.0[0], 0);
-        let (r1, carry) = mac(r1, k, MODULUS.0[1], carry);
-        let (r2, carry) = mac(r2, k, MODULUS.0[2], carry);
-        let (r3, carry) = mac(r3, k, MODULUS.0[3], carry);
-        let (r4, carry2) = adc(r4, 0, carry);
+        unsafe {
+            asm!(
+                // The Montgomery reduction here is based on Algorithm 14.32 in
+                // Handbook of Applied Cryptography
+                // <https://cacr.uwaterloo.ca/hac/about/chap14.pdf>.
 
-        let k = r1.wrapping_mul(INV);
-        let (_, carry) = mac(r1, k, MODULUS.0[0], 0);
-        let (r2, carry) = mac(r2, k, MODULUS.0[1], carry);
-        let (r3, carry) = mac(r3, k, MODULUS.0[2], carry);
-        let (r4, carry) = mac(r4, k, MODULUS.0[3], carry);
-        let (r5, carry2) = adc(r5, carry2, carry);
+                "mov r8, qword ptr [{a_ptr} + 0]",
+                "mov r9, qword ptr [{a_ptr} + 8]",
+                "mov r10, qword ptr [{a_ptr} + 16]",
+                "mov r11, qword ptr [{a_ptr} + 24]",
+                "mov r12, qword ptr [{a_ptr} + 32]",
+                "mov r13, qword ptr [{a_ptr} + 40]",
+                "mov r14, qword ptr [{a_ptr} + 48]",
+                "mov r15, qword ptr [{a_ptr} + 56]",
 
-        let k = r2.wrapping_mul(INV);
-        let (_, carry) = mac(r2, k, MODULUS.0[0], 0);
-        let (r3, carry) = mac(r3, k, MODULUS.0[1], carry);
-        let (r4, carry) = mac(r4, k, MODULUS.0[2], carry);
-        let (r5, carry) = mac(r5, k, MODULUS.0[3], carry);
-        let (r6, carry2) = adc(r6, carry2, carry);
+                // `r8` -> 0
+                "mov rdx, qword ptr [{i_ptr}]",
+                "mulx rax, rdx, r8",
 
-        let k = r3.wrapping_mul(INV);
-        let (_, carry) = mac(r3, k, MODULUS.0[0], 0);
-        let (r4, carry) = mac(r4, k, MODULUS.0[1], carry);
-        let (r5, carry) = mac(r5, k, MODULUS.0[2], carry);
-        let (r6, carry) = mac(r6, k, MODULUS.0[3], carry);
-        let (r7, _) = adc(r7, carry2, carry);
+                // r8' * m0
+                "mulx rcx, rax, qword ptr [{m_ptr} + 0]",
+                "add r8, rax",
+                "adcx r9, rcx",
+                "adc r10, 0",
 
-        // Result may be within MODULUS of the correct value
-        (&Fr([r4, r5, r6, r7])).sub(&MODULUS)
+                // r8' * m1
+                "mulx rcx, rax, qword ptr [{m_ptr} + 8]",
+                "adcx r9, rax",
+                "adcx r10, rcx",
+                "adc r11, 0",
+
+                // // r8' * m2
+                "mulx rcx, rax, qword ptr [{m_ptr} + 16]",
+                "add r10, rax",
+                "adcx r11, rcx",
+                "adc r12, 0",
+
+                // // r8' * m3
+                "mulx rcx, rax, qword ptr [{m_ptr} + 24]",
+                "add r11, rax",
+                "adcx r12, rcx",
+                "adc r13, 0",
+
+                // `r9` -> 0
+                "mov rdx, qword ptr [{i_ptr}]",
+                "mulx rax, rdx, r9",
+
+                // r9' * m0
+                "mulx rax, rcx, qword ptr [{m_ptr} + 0]",
+                "add r9, rcx",
+                "adcx r10, rax",
+                "adc r11, 0",
+
+                // r9' * m1
+                "mulx rax, rcx, qword ptr [{m_ptr} + 8]",
+                "adcx r10, rcx",
+                "adcx r11, rax",
+                "adc r12, 0",
+
+                // r9' * m2
+                "mulx rax, rcx, qword ptr [{m_ptr} + 16]",
+                "adcx r11, rcx",
+                "adcx r12, rax",
+                "adc r13, 0",
+
+                // r9' * m3
+                "mulx rax, rcx, qword ptr [{m_ptr} + 24]",
+                "adcx r12, rcx",
+                "adcx r13, rax",
+                "adc r14, 0",
+
+                // `r10` -> 0
+                "mov rdx, qword ptr [{i_ptr}]",
+                "mulx rax, rdx, r10",
+
+                // r10' * m0
+                "mulx rax, rcx, qword ptr [{m_ptr} + 0]",
+                "add r10, rcx",
+                "adcx r11, rax",
+                "adc r12, 0",
+
+                // r10' * m1
+                "mulx rax, rcx, qword ptr [{m_ptr} + 8]",
+                "add r11, rcx",
+                "adcx r12, rax",
+                "adc r13, 0",
+
+                // r10' * m2
+                "mulx rax, rcx, qword ptr [{m_ptr} + 16]",
+                "add r12, rcx",
+                "adcx r13, rax",
+                "adc r14, 0",
+
+                // r10' * m3
+                "mulx rax, rcx, qword ptr [{m_ptr} + 24]",
+                "add r13, rcx",
+                "adcx r14, rax",
+                "adc r15, 0",
+
+                // `r11` -> 0
+                "mov rdx, qword ptr [{i_ptr}]",
+                "mulx rax, rdx, r11",
+
+                // r11' * m0
+                "mulx rax, rcx, qword ptr [{m_ptr} + 0]",
+                "add r11, rcx",
+                "adcx r12, rax",
+                "adc r13, 0",
+
+                // r11' * m1
+                "mulx rax, rcx, qword ptr [{m_ptr} + 8]",
+                "add r12, rcx",
+                "adcx r13, rax",
+                "adc r14, 0",
+
+                // r11' * m2
+                "mulx rax, rcx, qword ptr [{m_ptr} + 16]",
+                "add r13, rcx",
+                "adcx r14, rax",
+                "adc r15, 0",
+
+                // r11' * m3
+                "mulx rax, rcx, qword ptr [{m_ptr} + 24]",
+                "add r14, rcx",
+                "adcx r15, rax",
+
+                // reduction if limbs is greater then mod
+                "mov r8, r12",
+                "mov r9, r13",
+                "mov r10, r14",
+                "mov r11, r15",
+
+                "sub r8, qword ptr [{m_ptr} + 0]",
+                "sbb r9, qword ptr [{m_ptr} + 8]",
+                "sbb r10, qword ptr [{m_ptr} + 16]",
+                "sbb r11, qword ptr [{m_ptr} + 24]",
+
+                "cmovc r8, r12",
+                "cmovc r9, r13",
+                "cmovc r10, r14",
+                "cmovc r11, r15",
+
+                i_ptr = in(reg) &INV,
+                a_ptr = in(reg) a.as_ptr(),
+                m_ptr = in(reg) MODULUS.0.as_ptr(),
+                out("rax") _,
+                out("rcx") _,
+                out("rdx") _,
+                out("r8") _,
+                out("r9") _,
+                out("r10") _,
+                out("r11") _,
+                out("r12") r0,
+                out("r13") r1,
+                out("r14") r2,
+                out("r15") r3,
+                options(pure, readonly, nostack)
+            )
+        }
+
+        Fr([r0, r1, r2, r3])
     }
 
     /// Multiplies `rhs` by `self`, returning the result.
     #[inline]
     pub fn mul(&self, rhs: &Self) -> Self {
-        // Schoolbook multiplication
+        let mut r0: u64;
+        let mut r1: u64;
+        let mut r2: u64;
+        let mut r3: u64;
+        let mut r4: u64;
+        let mut r5: u64;
+        let mut r6: u64;
+        let mut r7: u64;
+        unsafe {
+            asm!(
+                // schoolbook multiplication
+                //    *    |   a0    |   a1    |   a2    |   a3
+                //    b0   | b0 * a0 | b0 * a1 | b0 * a2 | b0 * a3
+                //    b1   | b1 * a0 | b1 * a1 | b1 * a2 | b1 * a3
+                //    b2   | b2 * a0 | b2 * a1 | b2 * a2 | b2 * a3
+                //    b3   | b3 * a0 | b3 * a1 | b3 * a2 | b3 * a3
 
-        let (r0, carry) = mac(0, self.0[0], rhs.0[0], 0);
-        let (r1, carry) = mac(0, self.0[0], rhs.0[1], carry);
-        let (r2, carry) = mac(0, self.0[0], rhs.0[2], carry);
-        let (r3, r4) = mac(0, self.0[0], rhs.0[3], carry);
+                // init registers
+                "xor r13, r13",
+                "xor r14, r14",
+                "xor r15, r15",
 
-        let (r1, carry) = mac(r1, self.0[1], rhs.0[0], 0);
-        let (r2, carry) = mac(r2, self.0[1], rhs.0[1], carry);
-        let (r3, carry) = mac(r3, self.0[1], rhs.0[2], carry);
-        let (r4, r5) = mac(r4, self.0[1], rhs.0[3], carry);
+                // `a0`
+                "mov rdx, qword ptr [{a_ptr} + 0]",
 
-        let (r2, carry) = mac(r2, self.0[2], rhs.0[0], 0);
-        let (r3, carry) = mac(r3, self.0[2], rhs.0[1], carry);
-        let (r4, carry) = mac(r4, self.0[2], rhs.0[2], carry);
-        let (r5, r6) = mac(r5, self.0[2], rhs.0[3], carry);
+                // a0 * b0
+                "mulx r9, r8, qword ptr [{b_ptr} + 0]",
 
-        let (r3, carry) = mac(r3, self.0[3], rhs.0[0], 0);
-        let (r4, carry) = mac(r4, self.0[3], rhs.0[1], carry);
-        let (r5, carry) = mac(r5, self.0[3], rhs.0[2], carry);
-        let (r6, r7) = mac(r6, self.0[3], rhs.0[3], carry);
+                // a0 * b1
+                "mulx r10, rax, qword ptr [{b_ptr} + 8]",
+                "add r9, rax",
 
-        Fr::montgomery_reduce(r0, r1, r2, r3, r4, r5, r6, r7)
+                // a0 * b2
+                "mulx r11, rax, qword ptr [{b_ptr} + 16]",
+                "adcx r10, rax",
+
+                // a0 * b3
+                "mulx r12, rax, qword ptr [{b_ptr} + 24]",
+                "adcx r11, rax",
+                "adc r12, 0",
+
+                // `a1`
+                "mov rdx, [{a_ptr} + 8]",
+
+                // a1 * b0
+                "mulx rcx, rax, qword ptr [{b_ptr} + 0]",
+                "add r9, rax",
+                "adcx r10, rcx",
+                "adc r11, 0",
+
+                // a1 * b1
+                "mulx rcx, rax, qword ptr [{b_ptr} + 8]",
+                "add r10, rax",
+                "adcx r11, rcx",
+                "adc r12, 0",
+
+                // a1 * b2
+                "mulx rcx, rax, qword ptr [{b_ptr} + 16]",
+                "add r11, rax",
+                "adcx r12, rcx",
+                "adc r13, 0",
+
+                // a1 * b3
+                "mulx rcx, rax, qword ptr [{b_ptr} + 24]",
+                "add r12, rax",
+                "adcx r13, rcx",
+                "adc r14, 0",
+
+                // `a2`
+                "mov rdx, [{a_ptr} + 16]",
+
+                // a2 * b0
+                "mulx rcx, rax, qword ptr [{b_ptr} + 0]",
+                "add r10, rax",
+                "adcx r11, rcx",
+                "adc r12, 0",
+
+                // a2 * b1
+                "mulx rcx, rax, qword ptr [{b_ptr} + 8]",
+                "add r11, rax",
+                "adcx r12, rcx",
+                "adc r13, 0",
+
+                // a2 * b2
+                "mulx rcx, rax, qword ptr [{b_ptr} + 16]",
+                "add r12, rax",
+                "adcx r13, rcx",
+                "adc r14, 0",
+
+                // a2 * b3
+                "mulx rcx, rax, qword ptr [{b_ptr} + 24]",
+                "adcx r13, rax",
+                "adcx r14, rcx",
+                "adc r15, 0",
+
+                // `a3`
+                "mov rdx, [{a_ptr} + 24]",
+
+                // a3 * b0
+                "mulx rcx, rax, qword ptr [{b_ptr} + 0]",
+                "add r11, rax",
+                "adcx r12, rcx",
+                "adc r13, 0",
+
+                // a3 * b1
+                "mulx rcx, rax, qword ptr [{b_ptr} + 8]",
+                "adcx r12, rax",
+                "adcx r13, rcx",
+                "adc r14, 0",
+
+                // a3 * b2
+                "mulx rcx, rax, qword ptr [{b_ptr} + 16]",
+                "adcx r13, rax",
+                "adcx r14, rcx",
+                "adc r15, 0",
+
+                // a3 * b3
+                "mulx rcx, rax, qword ptr [{b_ptr} + 24]",
+                "adcx r14, rax",
+                "adc r15, rcx",
+
+                a_ptr = in(reg) self.0.as_ptr(),
+                b_ptr = in(reg) rhs.0.as_ptr(),
+                out("rax") _,
+                out("rcx") _,
+                out("rdx") _,
+                out("r8") r0,
+                out("r9") r1,
+                out("r10") r2,
+                out("r11") r3,
+                out("r12") r4,
+                out("r13") r5,
+                out("r14") r6,
+                out("r15") r7,
+                options(pure, readonly, nostack)
+            )
+        }
+
+        Fr::montgomery_reduce(&[r0, r1, r2, r3, r4, r5, r6, r7])
     }
 
     /// Subtracts `rhs` from `self`, returning the result.
@@ -714,7 +953,7 @@ impl ff::PrimeField for Fr {
     fn to_repr(&self) -> Self::Repr {
         // Turn into canonical form by computing
         // (a.R) / R = a
-        let tmp = Fr::montgomery_reduce(self.0[0], self.0[1], self.0[2], self.0[3], 0, 0, 0, 0);
+        let tmp = Fr::montgomery_reduce(&[self.0[0], self.0[1], self.0[2], self.0[3], 0, 0, 0, 0]);
 
         let mut res = [0; 32];
         res[0..8].copy_from_slice(&tmp.0[0].to_le_bytes());
@@ -844,19 +1083,11 @@ impl FieldExt for Fr {
     /// Gets the lower 128 bits of this field element when expressed
     /// canonically.
     fn get_lower_128(&self) -> u128 {
-        let tmp = Fr::montgomery_reduce(self.0[0], self.0[1], self.0[2], self.0[3], 0, 0, 0, 0);
+        let tmp = Fr::montgomery_reduce(&[self.0[0], self.0[1], self.0[2], self.0[3], 0, 0, 0, 0]);
 
         u128::from(tmp.0[0]) | (u128::from(tmp.0[1]) << 64)
     }
 }
-
-// MODULUS          : 0x0000000000000000000000000000000000000000000000000000000000000000
-// GENERATOR        : 0x0000000000000000000000000000000000000000000000000000000000000007
-// ROOT_OF_UNITY    : 0x03ddb9f5166d18b798865ea93dd31f743215cf6dd39329c8d34f1ed960c37c9c
-// TWO_INV          : 0x183227397098d014dc2822db40c0ac2e9419f4243cdcb848a1f0fac9f8000001
-// ROOT_OF_UNITY_INV: 0x048127174daabc261bbe587180f34361b22625f59115aba70ed3e50a414e6dba
-// DELTA            : 0x09226b6e22c6f0ca64ec26aad4c86e715b5f898e5e963f25870e56bbe533e9a2
-// ZETA             : 0x30644e72e131a029048b6e193fd84104cc37a73fec2bc5e9b8ca0b2d36636f23
 
 #[cfg(test)]
 mod fr_tests {
