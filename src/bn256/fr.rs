@@ -4,6 +4,8 @@ use core::fmt;
 use core::ops::{Add, Mul, Neg, Sub};
 use rand::RngCore;
 use std::io::{self, Read, Write};
+use std::ops::AddAssign;
+use std::ops::MulAssign;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 
 use crate::arithmetic::{adc, mac, sbb, BaseExt, FieldExt, Group};
@@ -226,19 +228,19 @@ impl Fr {
 
     /// Returns zero, the additive identity.
     #[inline]
-    pub const fn zero() -> Fr {
-        Fr([0, 0, 0, 0])
+    pub const fn zero() -> Self {
+        Self([0, 0, 0, 0])
     }
 
     /// Returns one, the multiplicative identity.
     #[inline]
-    pub const fn one() -> Fr {
+    pub const fn one() -> Self {
         R
     }
 
     /// Doubles this field element.
     #[inline]
-    pub fn double(&self) -> Fr {
+    pub fn double(&self) -> Self {
         let mut r0: u64;
         let mut r1: u64;
         let mut r2: u64;
@@ -288,10 +290,10 @@ impl Fr {
                 options(pure, readonly, nostack)
             );
         }
-        Fr([r0, r1, r2, r3])
+        Self([r0, r1, r2, r3])
     }
 
-    fn from_u512(limbs: [u64; 8]) -> Fr {
+    fn from_u512(limbs: [u64; 8]) -> Self {
         // We reduce an arbitrary 512-bit number by decomposing it into two 256-bit digits
         // with the higher bits multiplied by 2^256. Thus, we perform two reductions
         //
@@ -305,10 +307,13 @@ impl Fr {
         // that (2^256 - 1)*c is an acceptable product for the reduction. Therefore, the
         // reduction always works so long as `c` is in the field; in this case it is either the
         // constant `R2` or `R3`.
-        let d0 = Fr([limbs[0], limbs[1], limbs[2], limbs[3]]);
-        let d1 = Fr([limbs[4], limbs[5], limbs[6], limbs[7]]);
+        let mut d0 = Fr([limbs[0], limbs[1], limbs[2], limbs[3]]);
+        let mut d1 = Fr([limbs[4], limbs[5], limbs[6], limbs[7]]);
         // Convert to Montgomery form
-        d0 * R2 + d1 * R3
+        d0.mul_assign(R2);
+        d1.mul_assign(R3);
+        d0.add_assign(d1);
+        d0
     }
 
     /// Converts from an integer represented in little endian
@@ -374,39 +379,150 @@ impl Fr {
         let (d2, carry) = adc(d2, MODULUS.0[2] & borrow, carry);
         let (d3, _) = adc(d3, MODULUS.0[3] & borrow, carry);
 
-        Fr([d0, d1, d2, d3])
+        Self([d0, d1, d2, d3])
     }
 
     /// Squares this element.
     #[inline]
-    pub fn square(&self) -> Fr {
-        let (r1, carry) = mac(0, self.0[0], self.0[1], 0);
-        let (r2, carry) = mac(0, self.0[0], self.0[2], carry);
-        let (r3, r4) = mac(0, self.0[0], self.0[3], carry);
+    pub fn square(&self) -> Self {
+        let mut r0: u64;
+        let mut r1: u64;
+        let mut r2: u64;
+        let mut r3: u64;
+        let mut r4: u64;
+        let mut r5: u64;
+        let mut r6: u64;
+        let mut r7: u64;
+        unsafe {
+            asm!(
+                // schoolbook multiplication
+                //    *    |   a0    |   a1    |   a2    |   a3
+                //    b0   | b0 * a0 | b0 * a1 | b0 * a2 | b0 * a3
+                //    b1   | b1 * a0 | b1 * a1 | b1 * a2 | b1 * a3
+                //    b2   | b2 * a0 | b2 * a1 | b2 * a2 | b2 * a3
+                //    b3   | b3 * a0 | b3 * a1 | b3 * a2 | b3 * a3
 
-        let (r3, carry) = mac(r3, self.0[1], self.0[2], 0);
-        let (r4, r5) = mac(r4, self.0[1], self.0[3], carry);
+                // init registers
+                "xor r13, r13",
+                "xor r14, r14",
+                "xor r15, r15",
 
-        let (r5, r6) = mac(r5, self.0[2], self.0[3], 0);
+                // `a0`
+                "mov rdx, qword ptr [{a_ptr} + 0]",
 
-        let r7 = r6 >> 63;
-        let r6 = (r6 << 1) | (r5 >> 63);
-        let r5 = (r5 << 1) | (r4 >> 63);
-        let r4 = (r4 << 1) | (r3 >> 63);
-        let r3 = (r3 << 1) | (r2 >> 63);
-        let r2 = (r2 << 1) | (r1 >> 63);
-        let r1 = r1 << 1;
+                // a0 * b0
+                "mulx r9, r8, qword ptr [{a_ptr} + 0]",
 
-        let (r0, carry) = mac(0, self.0[0], self.0[0], 0);
-        let (r1, carry) = adc(0, r1, carry);
-        let (r2, carry) = mac(r2, self.0[1], self.0[1], carry);
-        let (r3, carry) = adc(0, r3, carry);
-        let (r4, carry) = mac(r4, self.0[2], self.0[2], carry);
-        let (r5, carry) = adc(0, r5, carry);
-        let (r6, carry) = mac(r6, self.0[3], self.0[3], carry);
-        let (r7, _) = adc(0, r7, carry);
+                // a0 * b1
+                "mulx r10, rax, qword ptr [{a_ptr} + 8]",
+                "add r9, rax",
 
-        Fr::montgomery_reduce(&[r0, r1, r2, r3, r4, r5, r6, r7])
+                // a0 * b2
+                "mulx r11, rax, qword ptr [{a_ptr} + 16]",
+                "adcx r10, rax",
+
+                // a0 * b3
+                "mulx r12, rax, qword ptr [{a_ptr} + 24]",
+                "adcx r11, rax",
+                "adc r12, 0",
+
+                // `a1`
+                "mov rdx, [{a_ptr} + 8]",
+
+                // a1 * b0
+                "mulx rcx, rax, qword ptr [{a_ptr} + 0]",
+                "add r9, rax",
+                "adcx r10, rcx",
+                "adc r11, 0",
+
+                // a1 * b1
+                "mulx rcx, rax, qword ptr [{a_ptr} + 8]",
+                "add r10, rax",
+                "adcx r11, rcx",
+                "adc r12, 0",
+
+                // a1 * b2
+                "mulx rcx, rax, qword ptr [{a_ptr} + 16]",
+                "add r11, rax",
+                "adcx r12, rcx",
+                "adc r13, 0",
+
+                // a1 * b3
+                "mulx rcx, rax, qword ptr [{a_ptr} + 24]",
+                "add r12, rax",
+                "adcx r13, rcx",
+                "adc r14, 0",
+
+                // `a2`
+                "mov rdx, [{a_ptr} + 16]",
+
+                // a2 * b0
+                "mulx rcx, rax, qword ptr [{a_ptr} + 0]",
+                "add r10, rax",
+                "adcx r11, rcx",
+                "adc r12, 0",
+
+                // a2 * b1
+                "mulx rcx, rax, qword ptr [{a_ptr} + 8]",
+                "add r11, rax",
+                "adcx r12, rcx",
+                "adc r13, 0",
+
+                // a2 * b2
+                "mulx rcx, rax, qword ptr [{a_ptr} + 16]",
+                "add r12, rax",
+                "adcx r13, rcx",
+                "adc r14, 0",
+
+                // a2 * b3
+                "mulx rcx, rax, qword ptr [{a_ptr} + 24]",
+                "adcx r13, rax",
+                "adcx r14, rcx",
+                "adc r15, 0",
+
+                // `a3`
+                "mov rdx, [{a_ptr} + 24]",
+
+                // a3 * b0
+                "mulx rcx, rax, qword ptr [{a_ptr} + 0]",
+                "add r11, rax",
+                "adcx r12, rcx",
+                "adc r13, 0",
+
+                // a3 * b1
+                "mulx rcx, rax, qword ptr [{a_ptr} + 8]",
+                "adcx r12, rax",
+                "adcx r13, rcx",
+                "adc r14, 0",
+
+                // a3 * b2
+                "mulx rcx, rax, qword ptr [{a_ptr} + 16]",
+                "adcx r13, rax",
+                "adcx r14, rcx",
+                "adc r15, 0",
+
+                // a3 * b3
+                "mulx rcx, rax, qword ptr [{a_ptr} + 24]",
+                "adcx r14, rax",
+                "adc r15, rcx",
+
+                a_ptr = in(reg) self.0.as_ptr(),
+                out("rax") _,
+                out("rcx") _,
+                out("rdx") _,
+                out("r8") r0,
+                out("r9") r1,
+                out("r10") r2,
+                out("r11") r3,
+                out("r12") r4,
+                out("r13") r5,
+                out("r14") r6,
+                out("r15") r7,
+                options(pure, readonly, nostack)
+            )
+        }
+
+        Self::montgomery_reduce(&[r0, r1, r2, r3, r4, r5, r6, r7])
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -577,7 +693,7 @@ impl Fr {
             )
         }
 
-        Fr([r0, r1, r2, r3])
+        Self([r0, r1, r2, r3])
     }
 
     /// Multiplies `rhs` by `self`, returning the result.
@@ -721,7 +837,7 @@ impl Fr {
             )
         }
 
-        Fr::montgomery_reduce(&[r0, r1, r2, r3, r4, r5, r6, r7])
+        Self::montgomery_reduce(&[r0, r1, r2, r3, r4, r5, r6, r7])
     }
 
     /// Subtracts `rhs` from `self`, returning the result.
@@ -777,7 +893,7 @@ impl Fr {
                 options(pure, readonly, nostack)
             );
         }
-        Fr([r0, r1, r2, r3])
+        Self([r0, r1, r2, r3])
     }
 
     /// Adds `rhs` to `self`, returning the result.
@@ -829,7 +945,7 @@ impl Fr {
                 options(pure, readonly, nostack)
             );
         }
-        Fr([r0, r1, r2, r3])
+        Self([r0, r1, r2, r3])
     }
 
     /// Negates `self`.
@@ -847,7 +963,7 @@ impl Fr {
         // zero if `self` was zero, and `u64::max_value()` if self was nonzero.
         let mask = (((self.0[0] | self.0[1] | self.0[2] | self.0[3]) == 0) as u64).wrapping_sub(1);
 
-        Fr([d0 & mask, d1 & mask, d2 & mask, d3 & mask])
+        Self([d0 & mask, d1 & mask, d2 & mask, d3 & mask])
     }
 }
 
@@ -1094,17 +1210,6 @@ mod fr_tests {
     use super::*;
     use ff::{Field, PrimeField};
     use std::ops::{AddAssign, MulAssign, SubAssign};
-    #[test]
-    fn print_const_from_raw() {
-        println!("MODULUS          : {:?}", MODULUS);
-        println!("GENERATOR        : {:?}", GENERATOR);
-        println!("ROOT_OF_UNITY    : {:?}", ROOT_OF_UNITY);
-        println!("TWO_INV          : {:?}", Fr::TWO_INV);
-        println!("ROOT_OF_UNITY_INV: {:?}", Fr::ROOT_OF_UNITY_INV);
-        println!("DELTA            : {:?}", Fr::DELTA);
-        println!("ZETA             : {:?}", Fr::ZETA);
-    }
-
     #[test]
     fn test_zeta() {
         let a = Fr::ZETA;
