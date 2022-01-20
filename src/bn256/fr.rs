@@ -239,8 +239,56 @@ impl Fr {
     /// Doubles this field element.
     #[inline]
     pub fn double(&self) -> Fr {
-        // TODO: This can be achieved more efficiently with a bitshift.
-        self.add(self)
+        let mut r0: u64;
+        let mut r1: u64;
+        let mut r2: u64;
+        let mut r3: u64;
+        unsafe {
+            asm!(
+                // load a array to former registers
+                "mov r8, qword ptr [{a_ptr} + 0]",
+                "mov r9, qword ptr [{a_ptr} + 8]",
+                "mov r10, qword ptr [{a_ptr} + 16]",
+                "mov r11, qword ptr [{a_ptr} + 24]",
+
+                // // add a array and b array with carry
+                "add r8, r8",
+                "adc r9, r9",
+                "adc r10, r10",
+                "adc r11, r11",
+
+                // copy result array to latter registers
+                "mov r12, r8",
+                "mov r13, r9",
+                "mov r14, r10",
+                "mov r15, r11",
+
+                // mod reduction
+                "sub r12, qword ptr [{m_ptr} + 0]",
+                "sbb r13, qword ptr [{m_ptr} + 8]",
+                "sbb r14, qword ptr [{m_ptr} + 16]",
+                "sbb r15, qword ptr [{m_ptr} + 24]",
+
+                // if carry copy former registers to out areas
+                "cmovc r12, r8",
+                "cmovc r13, r9",
+                "cmovc r14, r10",
+                "cmovc r15, r11",
+
+                m_ptr = in(reg) MODULUS.0.as_ptr(),
+                a_ptr = in(reg) self.0.as_ptr(),
+                out("r8") _,
+                out("r9") _,
+                out("r10") _,
+                out("r11") _,
+                out("r12") r0,
+                out("r13") r1,
+                out("r14") r2,
+                out("r15") r3,
+                options(pure, readonly, nostack)
+            );
+        }
+        Fr([r0, r1, r2, r3])
     }
 
     fn from_u512(limbs: [u64; 8]) -> Fr {
@@ -440,19 +488,57 @@ impl Fr {
     /// Subtracts `rhs` from `self`, returning the result.
     #[inline]
     pub fn sub(&self, rhs: &Self) -> Self {
-        let (d0, borrow) = sbb(self.0[0], rhs.0[0], 0);
-        let (d1, borrow) = sbb(self.0[1], rhs.0[1], borrow);
-        let (d2, borrow) = sbb(self.0[2], rhs.0[2], borrow);
-        let (d3, borrow) = sbb(self.0[3], rhs.0[3], borrow);
+        let mut r0: u64;
+        let mut r1: u64;
+        let mut r2: u64;
+        let mut r3: u64;
+        unsafe {
+            asm!(
+                // init modulus area
+                "xor r12, r12",
+                "xor r13, r13",
+                "xor r14, r14",
+                "xor r15, r15",
 
-        // If underflow occurred on the final limb, borrow = 0xfff...fff, otherwise
-        // borrow = 0x000...000. Thus, we use it as a mask to conditionally add the modulus.
-        let (d0, carry) = adc(d0, MODULUS.0[0] & borrow, 0);
-        let (d1, carry) = adc(d1, MODULUS.0[1] & borrow, carry);
-        let (d2, carry) = adc(d2, MODULUS.0[2] & borrow, carry);
-        let (d3, _) = adc(d3, MODULUS.0[3] & borrow, carry);
+                // load a array to former registers
+                "mov r8, qword ptr [{a_ptr} + 0]",
+                "mov r9, qword ptr [{a_ptr} + 8]",
+                "mov r10, qword ptr [{a_ptr} + 16]",
+                "mov r11, qword ptr [{a_ptr} + 24]",
 
-        Fr([d0, d1, d2, d3])
+                // sub a array and b array with borrow
+                "sub r8, qword ptr [{b_ptr} + 0]",
+                "sbb r9, qword ptr [{b_ptr} + 8]",
+                "sbb r10, qword ptr [{b_ptr} + 16]",
+                "sbb r11, qword ptr [{b_ptr} + 24]",
+
+                // if carry copy modulus
+                "cmovc r12, qword ptr [{m_ptr} + 0]",
+                "cmovc r13, qword ptr [{m_ptr} + 8]",
+                "cmovc r14, qword ptr [{m_ptr} + 16]",
+                "cmovc r15, qword ptr [{m_ptr} + 24]",
+
+                // mod addition
+                "add  r12, r8",
+                "adc  r13, r9",
+                "adc  r14, r10",
+                "adc  r15, r11",
+
+                m_ptr = in(reg) MODULUS.0.as_ptr(),
+                a_ptr = in(reg) self.0.as_ptr(),
+                b_ptr = in(reg) rhs.0.as_ptr(),
+                out("r8") _,
+                out("r9") _,
+                out("r10") _,
+                out("r11") _,
+                out("r12") r0,
+                out("r13") r1,
+                out("r14") r2,
+                out("r15") r3,
+                options(pure, readonly, nostack)
+            );
+        }
+        Fr([r0, r1, r2, r3])
     }
 
     /// Adds `rhs` to `self`, returning the result.
