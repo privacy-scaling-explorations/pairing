@@ -266,12 +266,72 @@ impl Fr {
     /// Converts from an integer represented in little endian
     /// into its (congruent) `Fr` representation.
     pub const fn from_raw(val: [u64; 4]) -> Self {
-        (&Fr(val)).mul(&R2)
+        let (r0, carry) = mac(0, val[0], R2.0[0], 0);
+        let (r1, carry) = mac(0, val[0], R2.0[1], carry);
+        let (r2, carry) = mac(0, val[0], R2.0[2], carry);
+        let (r3, r4) = mac(0, val[0], R2.0[3], carry);
+
+        let (r1, carry) = mac(r1, val[1], R2.0[0], 0);
+        let (r2, carry) = mac(r2, val[1], R2.0[1], carry);
+        let (r3, carry) = mac(r3, val[1], R2.0[2], carry);
+        let (r4, r5) = mac(r4, val[1], R2.0[3], carry);
+
+        let (r2, carry) = mac(r2, val[2], R2.0[0], 0);
+        let (r3, carry) = mac(r3, val[2], R2.0[1], carry);
+        let (r4, carry) = mac(r4, val[2], R2.0[2], carry);
+        let (r5, r6) = mac(r5, val[2], R2.0[3], carry);
+
+        let (r3, carry) = mac(r3, val[3], R2.0[0], 0);
+        let (r4, carry) = mac(r4, val[3], R2.0[1], carry);
+        let (r5, carry) = mac(r5, val[3], R2.0[2], carry);
+        let (r6, r7) = mac(r6, val[3], R2.0[3], carry);
+
+        let k = r0.wrapping_mul(INV);
+        let (_, carry) = mac(r0, k, MODULUS.0[0], 0);
+        let (r1, carry) = mac(r1, k, MODULUS.0[1], carry);
+        let (r2, carry) = mac(r2, k, MODULUS.0[2], carry);
+        let (r3, carry) = mac(r3, k, MODULUS.0[3], carry);
+        let (r4, carry2) = adc(r4, 0, carry);
+
+        let k = r1.wrapping_mul(INV);
+        let (_, carry) = mac(r1, k, MODULUS.0[0], 0);
+        let (r2, carry) = mac(r2, k, MODULUS.0[1], carry);
+        let (r3, carry) = mac(r3, k, MODULUS.0[2], carry);
+        let (r4, carry) = mac(r4, k, MODULUS.0[3], carry);
+        let (r5, carry2) = adc(r5, carry2, carry);
+
+        let k = r2.wrapping_mul(INV);
+        let (_, carry) = mac(r2, k, MODULUS.0[0], 0);
+        let (r3, carry) = mac(r3, k, MODULUS.0[1], carry);
+        let (r4, carry) = mac(r4, k, MODULUS.0[2], carry);
+        let (r5, carry) = mac(r5, k, MODULUS.0[3], carry);
+        let (r6, carry2) = adc(r6, carry2, carry);
+
+        let k = r3.wrapping_mul(INV);
+        let (_, carry) = mac(r3, k, MODULUS.0[0], 0);
+        let (r4, carry) = mac(r4, k, MODULUS.0[1], carry);
+        let (r5, carry) = mac(r5, k, MODULUS.0[2], carry);
+        let (r6, carry) = mac(r6, k, MODULUS.0[3], carry);
+        let (r7, _) = adc(r7, carry2, carry);
+
+        let (d0, borrow) = sbb(r4, MODULUS.0[0], 0);
+        let (d1, borrow) = sbb(r5, MODULUS.0[1], borrow);
+        let (d2, borrow) = sbb(r6, MODULUS.0[2], borrow);
+        let (d3, borrow) = sbb(r7, MODULUS.0[3], borrow);
+
+        // If underflow occurred on the final limb, borrow = 0xfff...fff, otherwise
+        // borrow = 0x000...000. Thus, we use it as a mask to conditionally add the modulus.
+        let (d0, carry) = adc(d0, MODULUS.0[0] & borrow, 0);
+        let (d1, carry) = adc(d1, MODULUS.0[1] & borrow, carry);
+        let (d2, carry) = adc(d2, MODULUS.0[2] & borrow, carry);
+        let (d3, _) = adc(d3, MODULUS.0[3] & borrow, carry);
+
+        Fr([d0, d1, d2, d3])
     }
 
     /// Squares this element.
     #[inline]
-    pub const fn square(&self) -> Fr {
+    pub fn square(&self) -> Fr {
         let (r1, carry) = mac(0, self.0[0], self.0[1], 0);
         let (r2, carry) = mac(0, self.0[0], self.0[2], carry);
         let (r3, r4) = mac(0, self.0[0], self.0[3], carry);
@@ -303,7 +363,7 @@ impl Fr {
 
     #[allow(clippy::too_many_arguments)]
     #[inline(always)]
-    const fn montgomery_reduce(
+    fn montgomery_reduce(
         r0: u64,
         r1: u64,
         r2: u64,
@@ -351,7 +411,7 @@ impl Fr {
 
     /// Multiplies `rhs` by `self`, returning the result.
     #[inline]
-    pub const fn mul(&self, rhs: &Self) -> Self {
+    pub fn mul(&self, rhs: &Self) -> Self {
         // Schoolbook multiplication
 
         let (r0, carry) = mac(0, self.0[0], rhs.0[0], 0);
@@ -379,7 +439,7 @@ impl Fr {
 
     /// Subtracts `rhs` from `self`, returning the result.
     #[inline]
-    pub const fn sub(&self, rhs: &Self) -> Self {
+    pub fn sub(&self, rhs: &Self) -> Self {
         let (d0, borrow) = sbb(self.0[0], rhs.0[0], 0);
         let (d1, borrow) = sbb(self.0[1], rhs.0[1], borrow);
         let (d2, borrow) = sbb(self.0[2], rhs.0[2], borrow);
@@ -704,11 +764,30 @@ impl FieldExt for Fr {
     }
 }
 
+// MODULUS          : 0x0000000000000000000000000000000000000000000000000000000000000000
+// GENERATOR        : 0x0000000000000000000000000000000000000000000000000000000000000007
+// ROOT_OF_UNITY    : 0x03ddb9f5166d18b798865ea93dd31f743215cf6dd39329c8d34f1ed960c37c9c
+// TWO_INV          : 0x183227397098d014dc2822db40c0ac2e9419f4243cdcb848a1f0fac9f8000001
+// ROOT_OF_UNITY_INV: 0x048127174daabc261bbe587180f34361b22625f59115aba70ed3e50a414e6dba
+// DELTA            : 0x09226b6e22c6f0ca64ec26aad4c86e715b5f898e5e963f25870e56bbe533e9a2
+// ZETA             : 0x30644e72e131a029048b6e193fd84104cc37a73fec2bc5e9b8ca0b2d36636f23
+
 #[cfg(test)]
 mod fr_tests {
     use super::*;
     use ff::{Field, PrimeField};
     use std::ops::{AddAssign, MulAssign, SubAssign};
+    #[test]
+    fn print_const_from_raw() {
+        println!("MODULUS          : {:?}", MODULUS);
+        println!("GENERATOR        : {:?}", GENERATOR);
+        println!("ROOT_OF_UNITY    : {:?}", ROOT_OF_UNITY);
+        println!("TWO_INV          : {:?}", Fr::TWO_INV);
+        println!("ROOT_OF_UNITY_INV: {:?}", Fr::ROOT_OF_UNITY_INV);
+        println!("DELTA            : {:?}", Fr::DELTA);
+        println!("ZETA             : {:?}", Fr::ZETA);
+    }
+
     #[test]
     fn test_zeta() {
         let a = Fr::ZETA;
