@@ -693,7 +693,7 @@ impl Fr {
             )
         }
 
-        Self([r0, r1, r2, r3])
+        Self([r0, r1, r2, r3]).sub(MODULUS)
     }
 
     /// Multiplies `rhs` by `self`, returning the result.
