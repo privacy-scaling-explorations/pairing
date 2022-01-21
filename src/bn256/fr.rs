@@ -4,8 +4,6 @@ use core::fmt;
 use core::ops::{Add, Mul, Neg, Sub};
 use rand::RngCore;
 use std::io::{self, Read, Write};
-use std::ops::AddAssign;
-use std::ops::MulAssign;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 
 use crate::arithmetic::{adc, mac, sbb, BaseExt, FieldExt, Group};
@@ -307,13 +305,10 @@ impl Fr {
         // that (2^256 - 1)*c is an acceptable product for the reduction. Therefore, the
         // reduction always works so long as `c` is in the field; in this case it is either the
         // constant `R2` or `R3`.
-        let mut d0 = Fr([limbs[0], limbs[1], limbs[2], limbs[3]]);
-        let mut d1 = Fr([limbs[4], limbs[5], limbs[6], limbs[7]]);
+        let d0 = Fr([limbs[0], limbs[1], limbs[2], limbs[3]]);
+        let d1 = Fr([limbs[4], limbs[5], limbs[6], limbs[7]]);
         // Convert to Montgomery form
-        d0.mul_assign(R2);
-        d1.mul_assign(R3);
-        d0.add_assign(d1);
-        d0
+        d0 * R2 + d1 * R3
     }
 
     /// Converts from an integer represented in little endian
@@ -393,6 +388,7 @@ impl Fr {
         let mut r5: u64;
         let mut r6: u64;
         let mut r7: u64;
+        let rhs = self.clone();
         unsafe {
             asm!(
                 // schoolbook multiplication
@@ -411,18 +407,18 @@ impl Fr {
                 "mov rdx, qword ptr [{a_ptr} + 0]",
 
                 // a0 * b0
-                "mulx r9, r8, qword ptr [{a_ptr} + 0]",
+                "mulx r9, r8, qword ptr [{b_ptr} + 0]",
 
                 // a0 * b1
-                "mulx r10, rax, qword ptr [{a_ptr} + 8]",
+                "mulx r10, rax, qword ptr [{b_ptr} + 8]",
                 "add r9, rax",
 
                 // a0 * b2
-                "mulx r11, rax, qword ptr [{a_ptr} + 16]",
+                "mulx r11, rax, qword ptr [{b_ptr} + 16]",
                 "adcx r10, rax",
 
                 // a0 * b3
-                "mulx r12, rax, qword ptr [{a_ptr} + 24]",
+                "mulx r12, rax, qword ptr [{b_ptr} + 24]",
                 "adcx r11, rax",
                 "adc r12, 0",
 
@@ -430,25 +426,25 @@ impl Fr {
                 "mov rdx, [{a_ptr} + 8]",
 
                 // a1 * b0
-                "mulx rcx, rax, qword ptr [{a_ptr} + 0]",
+                "mulx rcx, rax, qword ptr [{b_ptr} + 0]",
                 "add r9, rax",
                 "adcx r10, rcx",
                 "adc r11, 0",
 
                 // a1 * b1
-                "mulx rcx, rax, qword ptr [{a_ptr} + 8]",
+                "mulx rcx, rax, qword ptr [{b_ptr} + 8]",
                 "add r10, rax",
                 "adcx r11, rcx",
                 "adc r12, 0",
 
                 // a1 * b2
-                "mulx rcx, rax, qword ptr [{a_ptr} + 16]",
+                "mulx rcx, rax, qword ptr [{b_ptr} + 16]",
                 "add r11, rax",
                 "adcx r12, rcx",
                 "adc r13, 0",
 
                 // a1 * b3
-                "mulx rcx, rax, qword ptr [{a_ptr} + 24]",
+                "mulx rcx, rax, qword ptr [{b_ptr} + 24]",
                 "add r12, rax",
                 "adcx r13, rcx",
                 "adc r14, 0",
@@ -457,25 +453,25 @@ impl Fr {
                 "mov rdx, [{a_ptr} + 16]",
 
                 // a2 * b0
-                "mulx rcx, rax, qword ptr [{a_ptr} + 0]",
+                "mulx rcx, rax, qword ptr [{b_ptr} + 0]",
                 "add r10, rax",
                 "adcx r11, rcx",
                 "adc r12, 0",
 
                 // a2 * b1
-                "mulx rcx, rax, qword ptr [{a_ptr} + 8]",
+                "mulx rcx, rax, qword ptr [{b_ptr} + 8]",
                 "add r11, rax",
                 "adcx r12, rcx",
                 "adc r13, 0",
 
                 // a2 * b2
-                "mulx rcx, rax, qword ptr [{a_ptr} + 16]",
+                "mulx rcx, rax, qword ptr [{b_ptr} + 16]",
                 "add r12, rax",
                 "adcx r13, rcx",
                 "adc r14, 0",
 
                 // a2 * b3
-                "mulx rcx, rax, qword ptr [{a_ptr} + 24]",
+                "mulx rcx, rax, qword ptr [{b_ptr} + 24]",
                 "adcx r13, rax",
                 "adcx r14, rcx",
                 "adc r15, 0",
@@ -484,29 +480,30 @@ impl Fr {
                 "mov rdx, [{a_ptr} + 24]",
 
                 // a3 * b0
-                "mulx rcx, rax, qword ptr [{a_ptr} + 0]",
+                "mulx rcx, rax, qword ptr [{b_ptr} + 0]",
                 "add r11, rax",
                 "adcx r12, rcx",
                 "adc r13, 0",
 
                 // a3 * b1
-                "mulx rcx, rax, qword ptr [{a_ptr} + 8]",
+                "mulx rcx, rax, qword ptr [{b_ptr} + 8]",
                 "adcx r12, rax",
                 "adcx r13, rcx",
                 "adc r14, 0",
 
                 // a3 * b2
-                "mulx rcx, rax, qword ptr [{a_ptr} + 16]",
+                "mulx rcx, rax, qword ptr [{b_ptr} + 16]",
                 "adcx r13, rax",
                 "adcx r14, rcx",
                 "adc r15, 0",
 
                 // a3 * b3
-                "mulx rcx, rax, qword ptr [{a_ptr} + 24]",
+                "mulx rcx, rax, qword ptr [{b_ptr} + 24]",
                 "adcx r14, rax",
                 "adc r15, rcx",
 
                 a_ptr = in(reg) self.0.as_ptr(),
+                b_ptr = in(reg) rhs.0.as_ptr(),
                 out("rax") _,
                 out("rcx") _,
                 out("rdx") _,
@@ -525,7 +522,6 @@ impl Fr {
         Self::montgomery_reduce(&[r0, r1, r2, r3, r4, r5, r6, r7])
     }
 
-    #[allow(clippy::too_many_arguments)]
     #[inline(always)]
     fn montgomery_reduce(a: &[u64; 8]) -> Self {
         let mut r0: u64;
@@ -953,6 +949,10 @@ impl Fr {
                 m_ptr = in(reg) MODULUS.0.as_ptr(),
                 a_ptr = in(reg) self.0.as_ptr(),
                 b_ptr = in(reg) rhs.0.as_ptr(),
+                out("r8") _,
+                out("r9") _,
+                out("r10") _,
+                out("r11") _,
                 out("r12") r0,
                 out("r13") r1,
                 out("r14") r2,
@@ -965,20 +965,62 @@ impl Fr {
 
     /// Negates `self`.
     #[inline]
-    pub const fn neg(&self) -> Self {
-        // Subtract `self` from `MODULUS` to negate. Ignore the final
-        // borrow because it cannot underflow; self is guaranteed to
-        // be in the field.
-        let (d0, borrow) = sbb(MODULUS.0[0], self.0[0], 0);
-        let (d1, borrow) = sbb(MODULUS.0[1], self.0[1], borrow);
-        let (d2, borrow) = sbb(MODULUS.0[2], self.0[2], borrow);
-        let (d3, _) = sbb(MODULUS.0[3], self.0[3], borrow);
+    pub fn neg(&self) -> Self {
+        let mut r0: u64;
+        let mut r1: u64;
+        let mut r2: u64;
+        let mut r3: u64;
+        let mut r4: u64;
+        unsafe {
+            asm!(
+                // load a array to former registers
+                "mov r8, qword ptr [{m_ptr} + 0]",
+                "mov r9, qword ptr [{m_ptr} + 8]",
+                "mov r10, qword ptr [{m_ptr} + 16]",
+                "mov r11, qword ptr [{m_ptr} + 24]",
 
-        // `tmp` could be `MODULUS` if `self` was zero. Create a mask that is
-        // zero if `self` was zero, and `u64::max_value()` if self was nonzero.
-        let mask = (((self.0[0] | self.0[1] | self.0[2] | self.0[3]) == 0) as u64).wrapping_sub(1);
+                "sub r8, qword ptr [{a_ptr} + 0]",
+                "sbb r9, qword ptr [{a_ptr} + 8]",
+                "sbb r10, qword ptr [{a_ptr} + 16]",
+                "sbb r11, qword ptr [{a_ptr} + 24]",
 
-        Self([d0 & mask, d1 & mask, d2 & mask, d3 & mask])
+                "mov r12, qword ptr [{a_ptr} + 0]",
+                "mov r13, qword ptr [{a_ptr} + 8]",
+                "mov r14, qword ptr [{a_ptr} + 16]",
+                "mov r15, qword ptr [{a_ptr} + 24]",
+
+                "or r12, r13",
+                "or r14, r15",
+                "or r12, r14",
+
+                "mov r13, 0xffffffffffffffff",
+                "cmp r12, 0x0000000000000000",
+                "cmove r13, r12",
+
+                "and r8, r13",
+                "and r9, r13",
+                "and r10, r13",
+                "and r11, r13",
+
+                m_ptr = in(reg) MODULUS.0.as_ptr(),
+                a_ptr = in(reg) self.0.as_ptr(),
+                out("r8") r0,
+                out("r9") r1,
+                out("r10") r2,
+                out("r11") r3,
+                out("r12") r4,
+                out("r13") _,
+                out("r14") _,
+                out("r15") _,
+                options(pure, readonly, nostack)
+            )
+        }
+        if self.0 == [0, 0, 0, 0] {
+            println!("{:?}", MODULUS.0);
+            println!("{:?}", [r0, r1, r2, r3]);
+            println!("{:?}", r4);
+        }
+        Self([r0, r1, r2, r3])
     }
 }
 
@@ -1234,6 +1276,21 @@ mod fr_tests {
         let c = b * a;
         println!("{:?}", c);
         assert!(c == Fr::one());
+    }
+
+    #[test]
+    fn test_neg() {
+        let a = Fr::from_raw([
+            0x7e7140b5196b9e6f,
+            0x9abac9e4157b6172,
+            0xf04bc41062fd7322,
+            0x1185fa9c9fef6326,
+        ]);
+        let b = a;
+        let mut b = b.neg();
+        b.add_assign(a);
+
+        assert_eq!(b, Fr::zero())
     }
 
     #[test]
