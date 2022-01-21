@@ -675,6 +675,21 @@ impl Fr {
                 "cmovc r10, r14",
                 "cmovc r11, r15",
 
+                "mov r12, r8",
+                "mov r13, r9",
+                "mov r14, r10",
+                "mov r15, r11",
+
+                "sub r12, qword ptr [{m_ptr} + 0]",
+                "sbb r13, qword ptr [{m_ptr} + 8]",
+                "sbb r14, qword ptr [{m_ptr} + 16]",
+                "sbb r15, qword ptr [{m_ptr} + 24]",
+
+                "cmovc r12, r8",
+                "cmovc r13, r9",
+                "cmovc r14, r10",
+                "cmovc r15, r11",
+
                 i_ptr = in(reg) &INV,
                 a_ptr = in(reg) a.as_ptr(),
                 m_ptr = in(reg) MODULUS.0.as_ptr(),
@@ -693,7 +708,7 @@ impl Fr {
             )
         }
 
-        Self([r0, r1, r2, r3]).sub(MODULUS)
+        Self([r0, r1, r2, r3])
     }
 
     /// Multiplies `rhs` by `self`, returning the result.
