@@ -1,10 +1,6 @@
 macro_rules! assembly_field {
     ($field:ident, $modulus:ident, $inv:ident) => {
         impl $field {
-            pub fn legendre(&self) -> LegendreSymbol {
-                unimplemented!()
-            }
-
             /// Returns zero, the additive identity.
             #[inline]
             pub const fn zero() -> $field {
@@ -86,8 +82,8 @@ macro_rules! assembly_field {
                 // that (2^256 - 1)*c is an acceptable product for the reduction. Therefore, the
                 // reduction always works so long as `c` is in the field; in this case it is either the
                 // constant `R2` or `R3`.
-                let d0 = Fr([limbs[0], limbs[1], limbs[2], limbs[3]]);
-                let d1 = Fr([limbs[4], limbs[5], limbs[6], limbs[7]]);
+                let d0 = $field([limbs[0], limbs[1], limbs[2], limbs[3]]);
+                let d1 = $field([limbs[4], limbs[5], limbs[6], limbs[7]]);
                 // Convert to Montgomery form
                 d0 * R2 + d1 * R3
             }
@@ -1044,10 +1040,10 @@ macro_rules! assembly_field {
                 unsafe {
                     asm!(
                         // load a array to former registers
-                        "mov r8, 0x43e1f593f0000001",
-                        "mov r9, 0x2833e84879b97091",
-                        "mov r10, 0xb85045b68181585d",
-                        "mov r11, 0x30644e72e131a029",
+                        "mov r8, qword ptr [{m_ptr} + 0]",
+                        "mov r9, qword ptr [{m_ptr} + 8]",
+                        "mov r10, qword ptr [{m_ptr} + 16]",
+                        "mov r11, qword ptr [{m_ptr} + 24]",
 
                         "sub r8, qword ptr [{a_ptr} + 0]",
                         "sbb r9, qword ptr [{a_ptr} + 8]",
@@ -1073,6 +1069,7 @@ macro_rules! assembly_field {
                         "and r11, r13",
 
                         a_ptr = in(reg) self.0.as_ptr(),
+                        m_ptr = in(reg) $modulus.0.as_ptr(),
                         out("r8") r0,
                         out("r9") r1,
                         out("r10") r2,

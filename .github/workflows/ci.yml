@@ -54,19 +54,3 @@ jobs:
         with:
           command: fmt
           args: --all -- --check
-
-  bench:
-    if: github.event.pull_request.draft == false
-    name: Bench
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          override: false
-      - name: bench arithmetic
-        uses: actions-rs/cargo@v1
-        with:
-          command: bench
-          args: arithmetic

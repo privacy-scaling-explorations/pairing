@@ -225,12 +225,14 @@ impl_binops_multiplicative!(Fr, Fr);
 #[cfg(feature = "asm")]
 assembly_field!(Fr, MODULUS, INV);
 
-#[cfg(not(feature = "asm"))]
 impl Fr {
     pub fn legendre(&self) -> LegendreSymbol {
         unimplemented!()
     }
+}
 
+#[cfg(not(feature = "asm"))]
+impl Fr {
     /// Returns zero, the additive identity.
     #[inline]
     pub const fn zero() -> Fr {
