@@ -253,9 +253,9 @@ impl Fr {
 
                 // // add a array and b array with carry
                 "add r8, r8",
-                "adc r9, r9",
-                "adc r10, r10",
-                "adc r11, r11",
+                "adcx r9, r9",
+                "adcx r10, r10",
+                "adcx r11, r11",
 
                 // copy result array to latter registers
                 "mov r12, r8",
@@ -393,7 +393,7 @@ impl Fr {
                 //    b2   | b2 * a0 | b2 * a1 | b2 * a2 | b2 * a3
                 //    b3   | b3 * a0 | b3 * a1 | b3 * a2 | b3 * a3
 
-                // init registers
+                // load value to registers
                 "mov r13, qword ptr [{a_ptr} + 0]",
                 "mov r14, qword ptr [{a_ptr} + 8]",
                 "mov r15, qword ptr [{a_ptr} + 16]",
@@ -470,7 +470,7 @@ impl Fr {
 
                 // a2 * b3
                 "mulx rcx, rax, qword ptr [{a_ptr} + 24]",
-                "adcx r13, rax",
+                "add r13, rax",
                 "adcx r14, rcx",
                 "adc r15, 0",
 
@@ -485,19 +485,19 @@ impl Fr {
 
                 // a3 * b1
                 "mulx rcx, rax, qword ptr [{a_ptr} + 8]",
-                "adcx r12, rax",
+                "add r12, rax",
                 "adcx r13, rcx",
                 "adc r14, 0",
 
                 // a3 * b2
                 "mulx rcx, rax, qword ptr [{a_ptr} + 16]",
-                "adcx r13, rax",
+                "add r13, rax",
                 "adcx r14, rcx",
                 "adc r15, 0",
 
                 // a3 * b3
                 "mulx rcx, rax, qword ptr [{a_ptr} + 24]",
-                "adcx r14, rax",
+                "add r14, rax",
                 "adc r15, rcx",
 
                 // montgomery reduction
@@ -515,7 +515,7 @@ impl Fr {
 
                 // r8' * m1
                 "mulx rcx, rax, qword ptr [{m_ptr} + 8]",
-                "adcx r9, rax",
+                "add r9, rax",
                 "adcx r10, rcx",
                 "adc r11, 0",
 
@@ -543,19 +543,19 @@ impl Fr {
 
                 // r9' * m1
                 "mulx rax, rcx, qword ptr [{m_ptr} + 8]",
-                "adcx r10, rcx",
+                "add r10, rcx",
                 "adcx r11, rax",
                 "adc r12, 0",
 
                 // r9' * m2
                 "mulx rax, rcx, qword ptr [{m_ptr} + 16]",
-                "adcx r11, rcx",
+                "add r11, rcx",
                 "adcx r12, rax",
                 "adc r13, 0",
 
                 // r9' * m3
                 "mulx rax, rcx, qword ptr [{m_ptr} + 24]",
-                "adcx r12, rcx",
+                "add r12, rcx",
                 "adcx r13, rax",
                 "adc r14, 0",
 
@@ -699,7 +699,7 @@ impl Fr {
 
                 // r8' * m1
                 "mulx rcx, rax, qword ptr [{m_ptr} + 8]",
-                "adcx r9, rax",
+                "add r9, rax",
                 "adcx r10, rcx",
                 "adc r11, 0",
 
@@ -727,19 +727,19 @@ impl Fr {
 
                 // r9' * m1
                 "mulx rax, rcx, qword ptr [{m_ptr} + 8]",
-                "adcx r10, rcx",
+                "add r10, rcx",
                 "adcx r11, rax",
                 "adc r12, 0",
 
                 // r9' * m2
                 "mulx rax, rcx, qword ptr [{m_ptr} + 16]",
-                "adcx r11, rcx",
+                "add r11, rcx",
                 "adcx r12, rax",
                 "adc r13, 0",
 
                 // r9' * m3
                 "mulx rax, rcx, qword ptr [{m_ptr} + 24]",
-                "adcx r12, rcx",
+                "add r12, rcx",
                 "adcx r13, rax",
                 "adc r14, 0",
 
@@ -865,23 +865,23 @@ impl Fr {
                 //    b2   | b2 * a0 | b2 * a1 | b2 * a2 | b2 * a3
                 //    b3   | b3 * a0 | b3 * a1 | b3 * a2 | b3 * a3
 
-                // init registers
-                "xor r13, r13",
-                "xor r14, r14",
-                "xor r15, r15",
+                // load value to registers
+                "mov r13, qword ptr [{b_ptr} + 0]",
+                "mov r14, qword ptr [{b_ptr} + 8]",
+                "mov r15, qword ptr [{b_ptr} + 16]",
 
                 // `a0`
                 "mov rdx, qword ptr [{a_ptr} + 0]",
 
                 // a0 * b0
-                "mulx r9, r8, qword ptr [{b_ptr} + 0]",
+                "mulx r9, r8, r13",
 
                 // a0 * b1
-                "mulx r10, rax, qword ptr [{b_ptr} + 8]",
+                "mulx r10, rax, r14",
                 "add r9, rax",
 
                 // a0 * b2
-                "mulx r11, rax, qword ptr [{b_ptr} + 16]",
+                "mulx r11, rax, r15",
                 "adcx r10, rax",
 
                 // a0 * b3
@@ -893,22 +893,24 @@ impl Fr {
                 "mov rdx, [{a_ptr} + 8]",
 
                 // a1 * b0
-                "mulx rcx, rax, qword ptr [{b_ptr} + 0]",
+                "mulx rcx, rax, r13",
                 "add r9, rax",
                 "adcx r10, rcx",
                 "adc r11, 0",
 
                 // a1 * b1
-                "mulx rcx, rax, qword ptr [{b_ptr} + 8]",
+                "mulx rcx, rax, r14",
                 "add r10, rax",
                 "adcx r11, rcx",
                 "adc r12, 0",
+                "xor r13, r13",
 
                 // a1 * b2
-                "mulx rcx, rax, qword ptr [{b_ptr} + 16]",
+                "mulx rcx, rax, r15",
                 "add r11, rax",
                 "adcx r12, rcx",
                 "adc r13, 0",
+                "xor r14, r14",
 
                 // a1 * b3
                 "mulx rcx, rax, qword ptr [{b_ptr} + 24]",
@@ -932,14 +934,15 @@ impl Fr {
                 "adc r13, 0",
 
                 // a2 * b2
-                "mulx rcx, rax, qword ptr [{b_ptr} + 16]",
+                "mulx rcx, rax, r15",
                 "add r12, rax",
                 "adcx r13, rcx",
                 "adc r14, 0",
+                "xor r15, r15",
 
                 // a2 * b3
                 "mulx rcx, rax, qword ptr [{b_ptr} + 24]",
-                "adcx r13, rax",
+                "add r13, rax",
                 "adcx r14, rcx",
                 "adc r15, 0",
 
@@ -954,19 +957,19 @@ impl Fr {
 
                 // a3 * b1
                 "mulx rcx, rax, qword ptr [{b_ptr} + 8]",
-                "adcx r12, rax",
+                "add r12, rax",
                 "adcx r13, rcx",
                 "adc r14, 0",
 
                 // a3 * b2
                 "mulx rcx, rax, qword ptr [{b_ptr} + 16]",
-                "adcx r13, rax",
+                "add r13, rax",
                 "adcx r14, rcx",
                 "adc r15, 0",
 
                 // a3 * b3
                 "mulx rcx, rax, qword ptr [{b_ptr} + 24]",
-                "adcx r14, rax",
+                "add r14, rax",
                 "adc r15, rcx",
 
                 // montgomery reduction
@@ -984,7 +987,7 @@ impl Fr {
 
                 // r8' * m1
                 "mulx rcx, rax, qword ptr [{m_ptr} + 8]",
-                "adcx r9, rax",
+                "add r9, rax",
                 "adcx r10, rcx",
                 "adc r11, 0",
 
@@ -1012,19 +1015,19 @@ impl Fr {
 
                 // r9' * m1
                 "mulx rax, rcx, qword ptr [{m_ptr} + 8]",
-                "adcx r10, rcx",
+                "add r10, rcx",
                 "adcx r11, rax",
                 "adc r12, 0",
 
                 // r9' * m2
                 "mulx rax, rcx, qword ptr [{m_ptr} + 16]",
-                "adcx r11, rcx",
+                "add r11, rcx",
                 "adcx r12, rax",
                 "adc r13, 0",
 
                 // r9' * m3
                 "mulx rax, rcx, qword ptr [{m_ptr} + 24]",
-                "adcx r12, rcx",
+                "add r12, rcx",
                 "adcx r13, rax",
                 "adc r14, 0",
 
@@ -1170,9 +1173,9 @@ impl Fr {
 
                 // mod addition
                 "add  r12, r8",
-                "adc  r13, r9",
-                "adc  r14, r10",
-                "adc  r15, r11",
+                "adcx  r13, r9",
+                "adcx  r14, r10",
+                "adcx  r15, r11",
 
                 m_ptr = in(reg) MODULUS.0.as_ptr(),
                 a_ptr = in(reg) self.0.as_ptr(),
@@ -1208,9 +1211,9 @@ impl Fr {
 
                 // add a array and b array with carry
                 "add r8, qword ptr [{b_ptr} + 0]",
-                "adc r9, qword ptr [{b_ptr} + 8]",
-                "adc r10, qword ptr [{b_ptr} + 16]",
-                "adc r11, qword ptr [{b_ptr} + 24]",
+                "adcx r9, qword ptr [{b_ptr} + 8]",
+                "adcx r10, qword ptr [{b_ptr} + 16]",
+                "adcx r11, qword ptr [{b_ptr} + 24]",
 
                 // copy result array to latter registers
                 "mov r12, r8",
@@ -1257,10 +1260,10 @@ impl Fr {
         unsafe {
             asm!(
                 // load a array to former registers
-                "mov r8, qword ptr [{m_ptr} + 0]",
-                "mov r9, qword ptr [{m_ptr} + 8]",
-                "mov r10, qword ptr [{m_ptr} + 16]",
-                "mov r11, qword ptr [{m_ptr} + 24]",
+                "mov r8, 0x43e1f593f0000001",
+                "mov r9, 0x2833e84879b97091",
+                "mov r10, 0xb85045b68181585d",
+                "mov r11, 0x30644e72e131a029",
 
                 "sub r8, qword ptr [{a_ptr} + 0]",
                 "sbb r9, qword ptr [{a_ptr} + 8]",
@@ -1285,7 +1288,6 @@ impl Fr {
                 "and r10, r13",
                 "and r11, r13",
 
-                m_ptr = in(reg) MODULUS.0.as_ptr(),
                 a_ptr = in(reg) self.0.as_ptr(),
                 out("r8") r0,
                 out("r9") r1,
