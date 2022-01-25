@@ -1,3 +1,4 @@
+use ark_std::{end_timer, start_timer};
 use ff::Field;
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
@@ -43,7 +44,9 @@ pub fn random_field_tests<F: Field>() {
 }
 
 fn random_multiplication_tests<F: Field, R: RngCore>(mut rng: R) {
-    for _ in 0..10000 {
+    let message = format!("multiplication");
+    let start = start_timer!(|| message);
+    for _ in 0..100000 {
         let a = F::random(&mut rng);
         let b = F::random(&mut rng);
         let c = F::random(&mut rng);
@@ -63,10 +66,13 @@ fn random_multiplication_tests<F: Field, R: RngCore>(mut rng: R) {
         assert_eq!(t0, t1);
         assert_eq!(t1, t2);
     }
+    end_timer!(start);
 }
 
 fn random_addition_tests<F: Field, R: RngCore>(mut rng: R) {
-    for _ in 0..10000 {
+    let message = format!("addition");
+    let start = start_timer!(|| message);
+    for _ in 0..100000 {
         let a = F::random(&mut rng);
         let b = F::random(&mut rng);
         let c = F::random(&mut rng);
@@ -86,10 +92,13 @@ fn random_addition_tests<F: Field, R: RngCore>(mut rng: R) {
         assert_eq!(t0, t1);
         assert_eq!(t1, t2);
     }
+    end_timer!(start);
 }
 
 fn random_subtraction_tests<F: Field, R: RngCore>(mut rng: R) {
-    for _ in 0..10000 {
+    let message = format!("subtraction");
+    let start = start_timer!(|| message);
+    for _ in 0..100000 {
         let a = F::random(&mut rng);
         let b = F::random(&mut rng);
 
@@ -104,10 +113,13 @@ fn random_subtraction_tests<F: Field, R: RngCore>(mut rng: R) {
 
         assert_eq!(t2.is_zero().unwrap_u8(), 1);
     }
+    end_timer!(start);
 }
 
 fn random_negation_tests<F: Field, R: RngCore>(mut rng: R) {
-    for _ in 0..10000 {
+    let message = format!("negation");
+    let start = start_timer!(|| message);
+    for _ in 0..100000 {
         let a = F::random(&mut rng);
         let mut b = a;
         b = b.neg();
@@ -115,10 +127,13 @@ fn random_negation_tests<F: Field, R: RngCore>(mut rng: R) {
 
         assert_eq!(b.is_zero().unwrap_u8(), 1);
     }
+    end_timer!(start);
 }
 
 fn random_doubling_tests<F: Field, R: RngCore>(mut rng: R) {
-    for _ in 0..10000 {
+    let message = format!("doubling");
+    let start = start_timer!(|| message);
+    for _ in 0..100000 {
         let mut a = F::random(&mut rng);
         let mut b = a;
         a.add_assign(&b);
@@ -126,10 +141,13 @@ fn random_doubling_tests<F: Field, R: RngCore>(mut rng: R) {
 
         assert_eq!(a, b);
     }
+    end_timer!(start);
 }
 
 fn random_squaring_tests<F: Field, R: RngCore>(mut rng: R) {
-    for _ in 0..10000 {
+    let message = format!("squaring");
+    let start = start_timer!(|| message);
+    for _ in 0..100000 {
         let mut a = F::random(&mut rng);
         let mut b = a;
         a.mul_assign(&b);
@@ -137,22 +155,28 @@ fn random_squaring_tests<F: Field, R: RngCore>(mut rng: R) {
 
         assert_eq!(a, b);
     }
+    end_timer!(start);
 }
 
 fn random_inversion_tests<F: Field, R: RngCore>(mut rng: R) {
     assert!(bool::from(F::zero().invert().is_none()));
 
-    for _ in 0..10000 {
+    let message = format!("inversion");
+    let start = start_timer!(|| message);
+    for _ in 0..100000 {
         let mut a = F::random(&mut rng);
         let b = a.invert().unwrap(); // probablistically nonzero
         a.mul_assign(&b);
 
         assert_eq!(a, F::one());
     }
+    end_timer!(start);
 }
 
 fn random_expansion_tests<F: Field, R: RngCore>(mut rng: R) {
-    for _ in 0..10000 {
+    let message = format!("expansion");
+    let start = start_timer!(|| message);
+    for _ in 0..100000 {
         // Compare (a + b)(c + d) and (a*c + b*c + a*d + b*d)
 
         let a = F::random(&mut rng);
@@ -181,4 +205,5 @@ fn random_expansion_tests<F: Field, R: RngCore>(mut rng: R) {
 
         assert_eq!(t0, t2);
     }
+    end_timer!(start);
 }
