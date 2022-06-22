@@ -2,6 +2,8 @@
 use super::assembly::assembly_field;
 use super::common::common_field;
 use super::LegendreSymbol;
+#[cfg(feature = "gpu")]
+use super::engine::u64_to_u32;
 use crate::arithmetic::{adc, mac, sbb, BaseExt, FieldExt, Group};
 use core::convert::TryInto;
 use core::fmt;
@@ -271,6 +273,21 @@ impl ff::PrimeField for Fq {
 
     fn root_of_unity() -> Self {
         unimplemented!()
+    }
+}
+
+#[cfg(feature = "gpu")]
+impl ec_gpu::GpuField for Fq {
+    fn one() -> Vec<u32> {
+        u64_to_u32(&R.0[..])
+    }
+
+    fn r2() -> Vec<u32> {
+        u64_to_u32(&R2.0[..])
+    }
+
+    fn modulus() -> Vec<u32> {
+        u64_to_u32(&MODULUS.0[..])
     }
 }
 

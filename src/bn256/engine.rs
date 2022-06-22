@@ -649,6 +649,20 @@ impl MultiMillerLoop for Bn256 {
     }
 }
 
+#[cfg(feature = "gpu")]
+impl ec_gpu::GpuEngine for Bn256 {
+    type Scalar = Fr;
+    type Fp = Fq;
+}
+
+#[cfg(feature = "gpu")]
+pub fn u64_to_u32(limbs: &[u64]) -> Vec<u32> {
+    limbs
+        .iter()
+        .flat_map(|limb| vec![(limb & 0xFFFF_FFFF) as u32, (limb >> 32) as u32])
+        .collect()
+}
+
 #[cfg(test)]
 use rand::SeedableRng;
 #[cfg(test)]
