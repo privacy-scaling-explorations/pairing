@@ -1,5 +1,4 @@
-#![feature(asm)]
-#![feature(asm_const)]
+#![cfg_attr(feature = "asm", feature(asm_const))]
 
 #[macro_use]
 mod ec;

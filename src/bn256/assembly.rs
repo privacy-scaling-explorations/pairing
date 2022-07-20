@@ -4,6 +4,8 @@ macro_rules! assembly_field {
             /// Doubles this field element.
             #[inline]
             pub fn double(&self) -> $field {
+                use core::arch::asm;
+
                 let mut r0: u64;
                 let mut r1: u64;
                 let mut r2: u64;
@@ -59,6 +61,8 @@ macro_rules! assembly_field {
             /// Squares this element.
             #[inline]
             pub fn square(&self) -> $field {
+                use core::arch::asm;
+
                 let mut r0: u64;
                 let mut r1: u64;
                 let mut r2: u64;
@@ -347,6 +351,8 @@ macro_rules! assembly_field {
 
             #[inline(always)]
             pub(crate) fn montgomery_reduce(a: &[u64; 8]) -> $field {
+                use core::arch::asm;
+
                 let mut r0: u64;
                 let mut r1: u64;
                 let mut r2: u64;
@@ -533,6 +539,8 @@ macro_rules! assembly_field {
             /// Multiplies `rhs` by `self`, returning the result.
             #[inline]
             pub fn mul(&self, rhs: &Self) -> $field {
+                use core::arch::asm;
+
                 let mut r0: u64;
                 let mut r1: u64;
                 let mut r2: u64;
@@ -823,6 +831,8 @@ macro_rules! assembly_field {
             /// Subtracts `rhs` from `self`, returning the result.
             #[inline]
             pub fn sub(&self, rhs: &Self) -> $field {
+                use core::arch::asm;
+
                 let mut r0: u64;
                 let mut r1: u64;
                 let mut r2: u64;
@@ -879,6 +889,8 @@ macro_rules! assembly_field {
             /// Adds `rhs` to `self`, returning the result.
             #[inline]
             pub fn add(&self, rhs: &Self) -> $field {
+                use core::arch::asm;
+
                 let mut r0: u64;
                 let mut r1: u64;
                 let mut r2: u64;
@@ -935,6 +947,8 @@ macro_rules! assembly_field {
             /// Negates `self`.
             #[inline]
             pub fn neg(&self) -> $field {
+                use core::arch::asm;
+
                 let mut r0: u64;
                 let mut r1: u64;
                 let mut r2: u64;
